@@ -8,15 +8,16 @@ from tkinter import filedialog
 import customtkinter as ctk
 
 import autenticacao
+import funcionarios
 import tema
 from database import (
     backup_banco,
     get_connection,
     obter_config,
     restaurar_banco,
-    salvar_config,
 )
 from interfaces.componentes import botao, confirmar, entrada, mensagem, painel, preencher, rotulo, tabela
+from interfaces.tela_login import CAMPOS_EMPRESA
 from validacoes import formatar_data
 
 
@@ -28,11 +29,25 @@ class TelaConfiguracoes(ctk.CTkFrame):
 
         box = painel(self)
         box.pack(fill="x", padx=16, pady=8)
-        rotulo(box, "Empresa", 15, True).pack(anchor="w", padx=14, pady=(12, 4))
-        self.nome = entrada(box, width=400)
-        self.nome.insert(0, obter_config("nome_empresa", "Dimensão do Logus"))
-        self.nome.pack(anchor="w", padx=14, pady=4)
-        botao(box, "Salvar nome da empresa", self._salvar_nome, width=220).pack(anchor="w", padx=14, pady=(6, 14))
+        rotulo(box, "Cadastro da empresa", 15, True).pack(anchor="w", padx=14, pady=(12, 4))
+        rotulo(
+            box,
+            "Dados usados no sistema e nos relatórios exportados.",
+            12, cor=tema.TXT_SUAVE,
+        ).pack(anchor="w", padx=14, pady=(0, 6))
+
+        grade = ctk.CTkFrame(box, fg_color="transparent")
+        grade.pack(fill="x", padx=14, pady=(0, 8))
+        self.campos_empresa = {}
+        for i, (chave, etiqueta) in enumerate(CAMPOS_EMPRESA):
+            rotulo(grade, etiqueta, 12).grid(row=i, column=0, sticky="w", padx=(0, 10), pady=3)
+            campo = entrada(grade, width=380)
+            campo.insert(0, obter_config(chave, ""))
+            campo.grid(row=i, column=1, sticky="w", pady=3)
+            self.campos_empresa[chave] = campo
+        botao(box, "Salvar dados da empresa", self._salvar_empresa, width=220).pack(
+            anchor="w", padx=14, pady=(6, 14)
+        )
 
         box2 = painel(self)
         box2.pack(fill="x", padx=16, pady=8)
@@ -71,9 +86,14 @@ class TelaConfiguracoes(ctk.CTkFrame):
             ],
         )
 
-    def _salvar_nome(self):
-        salvar_config("nome_empresa", self.nome.get().strip() or "Dimensão do Logus")
-        mensagem(self, "Configurações", "Nome da empresa atualizado.")
+    def _salvar_empresa(self):
+        dados = {chave: campo.get() for chave, campo in self.campos_empresa.items()}
+        try:
+            funcionarios.salvar_empresa(dados)
+        except ValueError as exc:
+            mensagem(self, "Empresa", str(exc), erro=True)
+            return
+        mensagem(self, "Empresa", "Dados da empresa salvos.")
 
     def _senha(self):
         from interfaces.tela_login import solicitar_troca_senha

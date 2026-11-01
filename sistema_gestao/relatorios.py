@@ -99,10 +99,9 @@ def recebimentos(ini=None, fim=None) -> list[dict]:
             SELECT g.data_pagamento, cl.nome AS cliente, m.numero_matricula,
                    g.valor_pago, g.forma_pagamento
             FROM pagamentos g
-            JOIN parcelas p ON p.id=g.parcela_id
             JOIN matriculas m ON m.id=g.matricula_id
             JOIN clientes cl ON cl.id=g.cliente_id
-            WHERE p.situacao != 'cancelada' AND g.data_pagamento BETWEEN ? AND ?
+            WHERE g.data_pagamento BETWEEN ? AND ?
             ORDER BY g.data_pagamento
             """,
             (i, f),

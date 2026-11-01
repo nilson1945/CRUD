@@ -137,18 +137,20 @@ def aplicar_encargos(parcela_id: int, juros: float, multa: float, desconto: floa
 
 
 def indicadores(mes: Optional[str] = None) -> dict:
-    """mes no formato AAAA-MM. Não conta parcelas canceladas como recebidas."""
+    """mes no formato AAAA-MM.
+
+    Valor já recebido conta como receita mesmo que a parcela seja cancelada
+    depois: o cancelamento encerra a cobrança, não apaga o dinheiro que entrou.
+    """
     atualizar_situacoes_atraso()
     mes = mes or date.today().strftime("%Y-%m")
     inicio, fim = f"{mes}-01", f"{mes}-31"
     with get_connection() as con:
         recebido_mes = con.execute(
             """
-            SELECT COALESCE(SUM(g.valor_pago),0) s
-            FROM pagamentos g
-            JOIN parcelas p ON p.id = g.parcela_id
-            WHERE p.situacao != 'cancelada'
-              AND g.data_pagamento BETWEEN ? AND ?
+            SELECT COALESCE(SUM(valor_pago),0) s
+            FROM pagamentos
+            WHERE data_pagamento BETWEEN ? AND ?
             """,
             (inicio, fim),
         ).fetchone()["s"]
@@ -174,12 +176,7 @@ def indicadores(mes: Optional[str] = None) -> dict:
             (date.today().isoformat(),),
         ).fetchone()["s"]
         total_pagamentos = con.execute(
-            """
-            SELECT COALESCE(SUM(g.valor_pago),0) s
-            FROM pagamentos g
-            JOIN parcelas p ON p.id = g.parcela_id
-            WHERE p.situacao != 'cancelada'
-            """
+            "SELECT COALESCE(SUM(valor_pago),0) s FROM pagamentos"
         ).fetchone()["s"]
         pendentes_qtd = con.execute(
             "SELECT COUNT(*) n FROM parcelas WHERE situacao IN ('pendente','parcial','atrasada')"
@@ -221,10 +218,9 @@ def recebimentos_por_mes(ano: Optional[int] = None) -> list[tuple[str, float]]:
     with get_connection() as con:
         rows = con.execute(
             """
-            SELECT substr(g.data_pagamento,1,7) mes, SUM(g.valor_pago) total
-            FROM pagamentos g
-            JOIN parcelas p ON p.id = g.parcela_id
-            WHERE p.situacao != 'cancelada' AND g.data_pagamento LIKE ?
+            SELECT substr(data_pagamento,1,7) mes, SUM(valor_pago) total
+            FROM pagamentos
+            WHERE data_pagamento LIKE ?
             GROUP BY mes ORDER BY mes
             """,
             (f"{ano}-%",),

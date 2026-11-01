@@ -43,6 +43,17 @@ python sistema_gestao\CRUD.py
 
 ## Acesso inicial
 
+Na primeira execução, a tela de abertura ("Primeiro acesso") permite cadastrar os dados da empresa e o primeiro usuário administrador:
+
+1. Clique em **Cadastrar empresa e usuário**.
+2. Preencha os dados da empresa (nome, CNPJ, telefone, e-mail, endereço, cidade e UF).
+3. Informe o nome do administrador, o **usuário** e a **senha** (mínimo 8 caracteres).
+4. Depois do cadastro, entre com o usuário e a senha criados.
+
+Os dados da empresa podem ser alterados a qualquer momento em **Configurações → Cadastro da empresa**.
+
+Se preferir, ainda existe a conta padrão de instalação:
+
 | Campo | Valor |
 |---|---|
 | Usuário | `admin` |
@@ -59,10 +70,10 @@ Colaboradores importados do arquivo `colaboradores.txt` entram com o primeiro no
 - **Clientes:** cadastro completo, CPF único, histórico de matrículas, pagamentos e lembretes.
 - **Cursos:** 20 cursos técnicos e 6 modalidades de vestibular já cadastrados, com faixa de referência e valor de venda editável.
 - **Matrículas:** cliente + um ou mais cursos (uma matrícula por vez), valor negociado congelado, parcelas geradas na inclusão.
-- **Financeiro:** parcelas, pagamentos parciais, juros, multa, desconto, atrasos. Parcelas canceladas não entram como receita.
+- **Financeiro:** parcelas, pagamentos parciais, juros, multa, desconto, atrasos. Parcelas canceladas deixam de ser cobradas, mas os valores já recebidos continuam contando como receita.
 - **Lembretes:** compromissos, cobranças, reuniões e vínculos com cliente, funcionário ou matrícula, com avisos na entrada.
 - **Relatórios:** filtros de período e exportação para Excel e PDF.
-- **Configurações:** nome da empresa, troca de senha, backup e restauração do banco, histórico de ações.
+- **Configurações:** cadastro da empresa, troca de senha, backup e restauração do banco, histórico de ações.
 
 ## Banco de dados
 
@@ -79,7 +90,7 @@ O arquivo antigo `dimensao_logus_interno.db` não é apagado.
 
 ## Manual rápido
 
-1. Entre com `admin` e a senha provisória; defina uma senha nova.
+1. No primeiro acesso, cadastre a empresa e o usuário administrador; depois entre com esse usuário e senha.
 2. Cadastre funcionários (somente administrador) e defina o perfil.
 3. Cadastre clientes. Informe o CPF para evitar duplicidade.
 4. Confira os valores de venda em **Cursos** (os valores da tabela são referência comercial).

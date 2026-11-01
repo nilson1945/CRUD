@@ -11,7 +11,9 @@ from database import (
     PERMISSOES_ADMIN,
     PERMISSOES_FUNCIONARIO,
     get_connection,
+    obter_config,
     registrar_acao,
+    salvar_config,
 )
 from validacoes import campo_obrigatorio, formatar_cpf, validar_cpf, validar_email
 
@@ -145,6 +147,99 @@ def salvar(dados: dict, usuario_logado: dict) -> int:
         con.commit()
         registrar_acao(usuario_logado["id"], "cadastrar", "funcionarios", fid, dados["nome"])
         return int(fid)
+
+
+def empresa_configurada() -> bool:
+    """Indica se o primeiro acesso (cadastro da empresa) já foi concluído."""
+    return obter_config("empresa_configurada", "0") == "1"
+
+
+def salvar_empresa(dados: dict) -> None:
+    """Grava os dados cadastrais da empresa nas configurações do sistema."""
+    nome = (dados.get("nome_empresa") or "").strip()
+    if not nome:
+        raise ValueError("Informe o nome da empresa.")
+    email = (dados.get("empresa_email") or "").strip()
+    if email and not validar_email(email):
+        raise ValueError("E-mail da empresa inválido.")
+    valores = {
+        "nome_empresa": nome,
+        "empresa_cnpj": (dados.get("empresa_cnpj") or "").strip(),
+        "empresa_telefone": (dados.get("empresa_telefone") or "").strip(),
+        "empresa_email": email,
+        "empresa_endereco": (dados.get("empresa_endereco") or "").strip(),
+        "empresa_cidade": (dados.get("empresa_cidade") or "").strip(),
+        "empresa_estado": (dados.get("empresa_estado") or "").strip().upper(),
+    }
+    for chave, valor in valores.items():
+        salvar_config(chave, valor)
+
+
+def criar_primeiro_administrador(empresa: dict, dados: dict) -> int:
+    """Cadastro de primeiro acesso: dados da empresa + primeiro usuário administrador."""
+    if empresa_configurada():
+        raise PermissionError("O sistema já foi configurado. Entre com seu usuário e senha.")
+    nome = (dados.get("nome") or "").strip()
+    usuario = (dados.get("usuario") or "").strip()
+    senha = dados.get("senha") or ""
+    if not nome:
+        raise ValueError("Informe o nome do administrador.")
+    if not usuario:
+        raise ValueError("Informe o usuário de acesso.")
+    if len(senha) < 8:
+        raise ValueError("A senha deve ter pelo menos 8 caracteres.")
+    salvar_empresa(empresa)
+
+    agora = datetime.now().isoformat(timespec="seconds")
+    sh = hash_senha(senha)
+    with get_connection() as con:
+        ocupado = con.execute(
+            "SELECT id FROM funcionarios WHERE usuario=?", (usuario,)
+        ).fetchone()
+        padrao = con.execute(
+            "SELECT id FROM funcionarios WHERE usuario='admin'"
+        ).fetchone()
+        alvo = padrao["id"] if padrao else None
+        if ocupado and ocupado["id"] != alvo:
+            raise ValueError("Este nome de usuário já está em uso.")
+        if alvo:
+            con.execute(
+                """
+                UPDATE funcionarios SET nome=?, usuario=?, senha_hash=?, senha_provisoria=0,
+                    tipo_usuario='administrador', situacao='ativo', permissoes=?
+                WHERE id=?
+                """,
+                (nome, usuario, sh, json.dumps(PERMISSOES_ADMIN), alvo),
+            )
+            con.execute(
+                "UPDATE usuarios SET usuario=?, senha_hash=?, tipo='administrador', ativo=1 "
+                "WHERE funcionario_id=?",
+                (usuario, sh, alvo),
+            )
+            fid = alvo
+        else:
+            cur = con.execute(
+                """
+                INSERT INTO funcionarios (
+                    nome, tipo_usuario, situacao, usuario, senha_hash,
+                    senha_provisoria, permissoes, data_admissao, criado_em
+                ) VALUES (?, 'administrador', 'ativo', ?, ?, 0, ?, ?, ?)
+                """,
+                (
+                    nome, usuario, sh, json.dumps(PERMISSOES_ADMIN),
+                    datetime.now().date().isoformat(), agora,
+                ),
+            )
+            fid = cur.lastrowid
+            con.execute(
+                "INSERT INTO usuarios (funcionario_id, usuario, senha_hash, tipo, ativo) "
+                "VALUES (?, ?, ?, 'administrador', 1)",
+                (fid, usuario, sh),
+            )
+        con.commit()
+    salvar_config("empresa_configurada", "1")
+    registrar_acao(fid, "primeiro_acesso", "funcionarios", fid, nome)
+    return int(fid)
 
 
 def inativar(fid: int, usuario_logado: dict) -> None:
