@@ -22,7 +22,7 @@ class TelaFuncionarios(ctk.CTkFrame):
         topo = painel(self)
         topo.pack(fill="x", padx=16, pady=16)
         rotulo(topo, "Funcionários", 20, True).pack(side="left", padx=16, pady=12)
-        self.busca = entrada(topo, width=240, placeholder_text="Nome, CPF ou usuário")
+        self.busca = entrada(topo, width=240, placeholder_text="Nome, CPF ou código")
         self.busca.pack(side="right", padx=8, pady=12)
         botao(topo, "Pesquisar", self.recarregar, "secundario", width=110).pack(side="right", pady=12)
         if eh_admin(app.sessao):
@@ -31,8 +31,8 @@ class TelaFuncionarios(ctk.CTkFrame):
         self.tree = tabela(
             self,
             [
-                ("ID", 50), ("Nome", 220), ("CPF", 130), ("Cargo", 140),
-                ("Usuário", 120), ("Perfil", 120), ("Situação", 90),
+                ("Código", 60), ("Nome", 220), ("CPF", 130), ("Cargo", 140),
+                ("Função", 140), ("Usuário", 120), ("Perfil", 120), ("Situação", 90),
             ],
         )
         barra = ctk.CTkFrame(self, fg_color="transparent")
@@ -49,7 +49,7 @@ class TelaFuncionarios(ctk.CTkFrame):
             self.tree,
             [
                 (r["id"], r["nome"], r["cpf"] or "", r["cargo"] or "",
-                 r["usuario"] or "", r["tipo_usuario"], r["situacao"])
+                 r["funcao"] or "", r["usuario"] or "", r["tipo_usuario"], r["situacao"])
                 for r in rows
             ],
             [r["id"] for r in rows],
@@ -59,16 +59,24 @@ class TelaFuncionarios(ctk.CTkFrame):
         if not eh_admin(self.app.sessao):
             mensagem(self, "Permissão", "Somente o administrador cadastra ou edita funcionários.", True)
             return
-        f = Formulario(self, "Funcionário" if not dados else "Editar funcionário", 560, 680)
+        f = Formulario(self, "Funcionário" if not dados else "Editar funcionário", 560, 720)
         d = dados or {}
         f.campo("nome", "Nome completo", d.get("nome", ""))
         f.campo("cpf", "CPF", d.get("cpf") or "")
         f.campo("rg", "RG", d.get("rg") or "")
         f.campo("data_nascimento", "Data de nascimento (DD/MM/AAAA)", formatar_data(d.get("data_nascimento")))
         f.campo("telefone", "Telefone", d.get("telefone") or "")
+        f.campo("celular", "Celular", d.get("celular") or "")
         f.campo("email", "E-mail", d.get("email") or "")
+        f.campo("cep", "CEP", d.get("cep") or "")
         f.campo("endereco", "Endereço", d.get("endereco") or "")
+        f.campo("numero", "Número", d.get("numero") or "")
+        f.campo("complemento", "Complemento", d.get("complemento") or "")
+        f.campo("bairro", "Bairro", d.get("bairro") or "")
+        f.campo("cidade", "Cidade", d.get("cidade") or "")
+        f.campo("estado", "Estado (UF)", d.get("estado") or "")
         f.campo("cargo", "Cargo", d.get("cargo") or "")
+        f.campo("funcao", "Função", d.get("funcao") or "")
         f.campo("data_admissao", "Data de admissão", formatar_data(d.get("data_admissao")))
         f.campo("salario", "Salário", formatar_moeda(d.get("salario")) if d.get("salario") else "")
         f.campo("usuario", "Usuário de acesso", d.get("usuario") or "")

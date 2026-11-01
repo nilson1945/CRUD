@@ -23,9 +23,12 @@ def listar(busca: str = "", incluir_inativos: bool = True) -> list[dict]:
     if not incluir_inativos:
         sql += " AND situacao='ativo'"
     if busca.strip():
-        sql += " AND (nome LIKE ? OR cpf LIKE ? OR usuario LIKE ?)"
+        sql += (
+            " AND (nome LIKE ? OR cpf LIKE ? OR usuario LIKE ?"
+            " OR CAST(id AS TEXT) LIKE ?)"
+        )
         like = f"%{busca.strip()}%"
-        params.extend([like, like, like])
+        params.extend([like, like, like, like])
     sql += " ORDER BY nome"
     with get_connection() as con:
         return [dict(r) for r in con.execute(sql, params)]
@@ -80,14 +83,20 @@ def salvar(dados: dict, usuario_logado: dict) -> int:
             con.execute(
                 """
                 UPDATE funcionarios SET nome=?, cpf=?, rg=?, data_nascimento=?,
-                    telefone=?, email=?, endereco=?, cargo=?, data_admissao=?,
-                    salario=?, tipo_usuario=?, situacao=?, usuario=?, permissoes=?
+                    telefone=?, celular=?, email=?, cep=?, endereco=?, numero=?,
+                    complemento=?, bairro=?, cidade=?, estado=?, cargo=?, funcao=?,
+                    data_admissao=?, salario=?, tipo_usuario=?, situacao=?,
+                    usuario=?, permissoes=?
                 WHERE id=?
                 """,
                 (
                     dados["nome"].strip(), cpf or None, dados.get("rg"),
                     dados.get("data_nascimento"), dados.get("telefone"),
-                    email or None, dados.get("endereco"), dados.get("cargo"),
+                    dados.get("celular"), email or None, dados.get("cep"),
+                    dados.get("endereco"), dados.get("numero"),
+                    dados.get("complemento"), dados.get("bairro"),
+                    dados.get("cidade"), (dados.get("estado") or "").strip().upper() or None,
+                    dados.get("cargo"), dados.get("funcao"),
                     dados.get("data_admissao"), dados.get("salario"),
                     tipo, dados.get("situacao") or "ativo", dados["usuario"],
                     json.dumps(perms), dados["id"],
@@ -121,15 +130,20 @@ def salvar(dados: dict, usuario_logado: dict) -> int:
         cur = con.execute(
             """
             INSERT INTO funcionarios (
-                nome, cpf, rg, data_nascimento, telefone, email, endereco, cargo,
-                data_admissao, salario, senha_hash, tipo_usuario, situacao, usuario,
-                senha_provisoria, permissoes, criado_em
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                nome, cpf, rg, data_nascimento, telefone, celular, email, cep,
+                endereco, numero, complemento, bairro, cidade, estado, cargo,
+                funcao, data_admissao, salario, senha_hash, tipo_usuario, situacao,
+                usuario, senha_provisoria, permissoes, criado_em
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
             """,
             (
                 dados["nome"].strip(), cpf or None, dados.get("rg"),
                 dados.get("data_nascimento"), dados.get("telefone"),
-                email or None, dados.get("endereco"), dados.get("cargo"),
+                dados.get("celular"), email or None, dados.get("cep"),
+                dados.get("endereco"), dados.get("numero"),
+                dados.get("complemento"), dados.get("bairro"),
+                dados.get("cidade"), (dados.get("estado") or "").strip().upper() or None,
+                dados.get("cargo"), dados.get("funcao"),
                 dados.get("data_admissao"), dados.get("salario"), sh, tipo,
                 dados.get("situacao") or "ativo", dados["usuario"],
                 json.dumps(perms), agora,

@@ -24,7 +24,18 @@ BACKUP_DIR = BASE_DIR / "backups"
 DB_PATH = DATA_DIR / "sistema_gestao.db"
 DB_LEGADO = BASE_DIR.parent / "dimensao_logus_interno.db"
 COLAB_TXT = BASE_DIR.parent / "colaboradores.txt"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+COLUNAS_FUNCIONARIOS = [
+    ("celular", "TEXT"),
+    ("cep", "TEXT"),
+    ("numero", "TEXT"),
+    ("complemento", "TEXT"),
+    ("bairro", "TEXT"),
+    ("cidade", "TEXT"),
+    ("estado", "TEXT"),
+    ("funcao", "TEXT"),
+]
 
 CURSOS_TECNICOS = [
     ("Enfermagem", 250, 450, 12),
@@ -102,6 +113,7 @@ def inicializar_banco() -> None:
 
     with get_connection() as con:
         _criar_tabelas(con)
+        _garantir_colunas_funcionarios(con)
         _garantir_versao(con)
         _seed_cursos(con)
         _seed_admin(con)
@@ -124,9 +136,17 @@ def _criar_tabelas(con: sqlite3.Connection) -> None:
             rg TEXT,
             data_nascimento TEXT,
             telefone TEXT,
+            celular TEXT,
             email TEXT,
+            cep TEXT,
             endereco TEXT,
+            numero TEXT,
+            complemento TEXT,
+            bairro TEXT,
+            cidade TEXT,
+            estado TEXT,
             cargo TEXT,
+            funcao TEXT,
             data_admissao TEXT,
             salario REAL,
             senha_hash TEXT,
@@ -282,6 +302,14 @@ def _criar_tabelas(con: sqlite3.Connection) -> None:
     )
 
 
+def _garantir_colunas_funcionarios(con: sqlite3.Connection) -> None:
+    """Adiciona colunas novas em bancos já existentes (migração incremental)."""
+    existentes = {r["name"] for r in con.execute("PRAGMA table_info(funcionarios)")}
+    for coluna, tipo in COLUNAS_FUNCIONARIOS:
+        if coluna not in existentes:
+            con.execute(f"ALTER TABLE funcionarios ADD COLUMN {coluna} {tipo}")
+
+
 def _garantir_versao(con: sqlite3.Connection) -> None:
     atual = con.execute(
         "SELECT valor FROM schema_meta WHERE chave='versao'"
@@ -289,6 +317,11 @@ def _garantir_versao(con: sqlite3.Connection) -> None:
     if not atual:
         con.execute(
             "INSERT INTO schema_meta(chave, valor) VALUES('versao', ?)",
+            (str(SCHEMA_VERSION),),
+        )
+    elif str(atual["valor"]) != str(SCHEMA_VERSION):
+        con.execute(
+            "UPDATE schema_meta SET valor=? WHERE chave='versao'",
             (str(SCHEMA_VERSION),),
         )
     if not con.execute(
