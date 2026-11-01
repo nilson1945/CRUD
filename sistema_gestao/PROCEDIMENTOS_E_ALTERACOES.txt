@@ -1,0 +1,210 @@
+===============================================================================
+ DIMENSÃO DO LOGUS - SISTEMA DE GESTÃO
+ REGISTRO DE PROCEDIMENTOS E ALTERAÇÕES
+ Versão: 2.0.0
+ Data: 01/11/2026
+===============================================================================
+
+Este documento descreve todos os procedimentos executados no projeto:
+ajustes de código, correções de regras de negócio, empacotamento do
+executável e geração do instalador.
+
+-------------------------------------------------------------------------------
+1. IDENTIFICAÇÃO
+-------------------------------------------------------------------------------
+Produto .............: Dimensão do Logus
+Versão ..............: 2.0.0
+Pasta do programa ...: h:\Desktop\CRUD\sistema_gestao
+Executável ..........: dist\SistemaGestao.exe
+Instalador ..........: installer_output\DimensaoLogus_Setup_2.0.0.exe
+Tecnologias .........: Python 3.13, CustomTkinter, SQLite, bcrypt,
+                       matplotlib, reportlab, openpyxl
+Empacotamento .......: PyInstaller 6.13 (onefile, modo GUI sem console)
+Instalador ..........: Inno Setup 6 (ISCC)
+
+-------------------------------------------------------------------------------
+2. ARQUIVOS DE BUILD (pasta sistema_gestao)
+-------------------------------------------------------------------------------
+build.spec
+    Script do PyInstaller. Gera um único executável "SistemaGestao.exe" em
+    modo GUI (console=False) e coleta explicitamente as dependências de
+    interface e relatórios (customtkinter, matplotlib, reportlab, openpyxl,
+    PIL, sqlite3, bcrypt, tkinter e backend Tk do matplotlib).
+    O arquivo de entrada é o main.py da pasta sistema_gestao.
+
+installer.iss
+    Script do Inno Setup 6. Define o nome "Dimensão do Logus", versão 2.0.0
+    e o arquivo de saída DimensaoLogus_Setup_2.0.0.exe.
+    Configurações relevantes:
+      - AppId fixo: garante que uma nova versão ATUALIZE a instalação
+        existente em vez de criar uma segunda cópia.
+      - PrivilegesRequired=lowest: instala em %LOCALAPPDATA%, permitindo que
+        o programa grave banco de dados e backups sem senha de administrador.
+      - Cria atalho no Menu Iniciar e, opcionalmente, na Área de Trabalho.
+      - Inclui o README.md (manual) na instalação.
+      - Remove as pastas data, backups e assets na desinstalação.
+      - Aborta a compilação se dist\SistemaGestao.exe não existir.
+
+build_installer.bat
+    Automação em um clique: executa o PyInstaller, confere se o executável
+    foi gerado e em seguida chama o ISCC para montar o instalador.
+    Usa a .venv do projeto quando existir; caso contrário, o Python do PATH.
+
+-------------------------------------------------------------------------------
+3. PROCEDIMENTOS EXECUTADOS
+-------------------------------------------------------------------------------
+
+3.1 Definição de nome e versão
+    Produto renomeado para "Dimensão do Logus", versão 2.0.0, refletido no
+    instalador (nome exibido, nome do arquivo de saída e atalhos).
+
+3.2 Persistência do banco de dados (arquivo database.py)
+    PROBLEMA: o caminho do banco era derivado de __file__. Ao rodar o
+    executável empacotado, isso apontava para a pasta temporária criada pelo
+    PyInstaller, fazendo os dados "desaparecerem" a cada execução.
+    SOLUÇÃO: o caminho passou a ser resolvido dinamicamente:
+      - Executável empacotado: pasta onde está o .exe (sys.frozen).
+      - Código-fonte: pasta do próprio módulo.
+    Resultado: banco (data\sistema_gestao.db), backups e exports ficam
+    gravados junto da instalação e permanecem entre as execuções.
+
+3.3 Tela inicial (login) - terminologia e cadastro de usuário
+    Arquivo: interfaces\tela_login.py
+    - O rótulo do campo passou de "Usuário ou e-mail" para "Usuário".
+      O login continua aceitando tanto o usuário quanto o e-mail cadastrado,
+      mas a orientação na tela agora é por usuário e senha.
+    - A tela inicial é destinada ao USUÁRIO do sistema (funcionário da
+      empresa). Ela NÃO cadastra dados da empresa.
+    - Foi incluída a opção "Novo cadastro" no rodapé da tela, que abre um
+      formulário com os campos:
+        Nome completo, Usuário de acesso, Senha, Confirmar senha
+      (senha com no mínimo 8 caracteres).
+    - Após concluir o cadastro, a janela volta para o login com o usuário já
+      preenchido, bastando digitar a senha.
+
+3.4 Regra do primeiro acesso
+    Arquivo: funcionarios.py
+    - Função primeiro_acesso_pendente(): retorna verdadeiro enquanto não
+      existir administrador ativo com senha definitiva.
+    - Enquanto pendente, a tela de login exibe o botão "Novo cadastro".
+    - Função criar_usuario_inicial(): cria o primeiro administrador do
+      sistema. Detalhe importante: ela reaproveita o registro semeado
+      "admin" em vez de criar um segundo administrador. Isso evita
+      administradores duplicados e elimina a senha padrão conhecida, que
+      deixaria de funcionar a partir do cadastro.
+    - Os demais usuários são cadastrados pelo administrador dentro do
+      programa, na tela Funcionários.
+
+3.5 Cadastro da empresa dentro do programa
+    Arquivo: interfaces\tela_configuracoes.py
+    - A aba de empresa, que antes salvava somente o nome, passou a ter o
+      cadastro completo: nome da empresa, CNPJ, telefone, e-mail, endereço,
+      cidade e UF.
+    - Os dados são gravados na tabela "configuracoes" com as chaves:
+      nome_empresa, empresa_cnpj, empresa_telefone, empresa_email,
+      empresa_endereco, empresa_cidade, empresa_estado.
+    - Função responsável: funcionarios.salvar_empresa() (valida o nome
+      obrigatório e o formato do e-mail).
+
+3.6 Correção da regra financeira de valores recebidos
+    Arquivos: financeiro.py e relatorios.py
+    PROBLEMA: ao cancelar uma matrícula, as parcelas em aberto passavam para
+    a situação "cancelada". Como os totais somavam pagamentos apenas de
+    parcelas não canceladas, um valor já recebido desaparecia do total após
+    o cancelamento (o dinheiro sumia do caixa).
+    SOLUÇÃO: valores efetivamente recebidos (registros da tabela pagamentos)
+    passaram a contar como receita independentemente do cancelamento
+    posterior. O cancelamento encerra a cobrança, não apaga o que já entrou.
+    Aplicado em:
+      - financeiro.indicadores(): recebido_mes e total_pagamentos
+      - financeiro.recebimentos_por_mes() (gráfico do dashboard)
+      - relatorios.recebimentos() (relatório de recebimentos)
+    MANTIDO COMO ESTAVA (parcela cancelada não é mais cobrada):
+      listar_parcelas(), a_receber, atraso e clientes_inadimplentes().
+    Também continua bloqueado pagar uma parcela cancelada e aplicar
+    encargos sobre ela.
+
+3.7 Manual do usuário
+    Arquivo: README.md
+    Atualizado com o novo fluxo de acesso inicial (cadastro de usuário na
+    tela de login), com o cadastro da empresa dentro do programa e com a
+    nova regra de parcelas canceladas no financeiro.
+
+3.8 Testes
+    Arquivo: tests\test_core.py
+    Resultado final: 9 testes executados, todos aprovados (OK).
+    O teste test_pagamento_parcial_e_cancelamento, que falhava antes da
+    correção do item 3.6, passou a ser aprovado.
+
+3.9 Geração do executável e do instalador
+    - Executável: pyinstaller --noconfirm build.spec
+      Saída: dist\SistemaGestao.exe (aproximadamente 67 MB)
+    - Instalador: ISCC installer.iss
+      Saída: installer_output\DimensaoLogus_Setup_2.0.0.exe (aprox. 68 MB)
+    Os dois arquivos foram gerados e atualizados em 01/11/2026.
+
+-------------------------------------------------------------------------------
+4. COMO RECOMPILAR APÓS NOVAS ALTERAÇÕES
+-------------------------------------------------------------------------------
+Opção 1 - automática (recomendada):
+    Abra a pasta sistema_gestao e execute:
+        build_installer.bat
+    O script empacota o programa, valida o executável e monta o instalador.
+
+Opção 2 - manual, passo a passo:
+    cd h:\Desktop\CRUD\sistema_gestao
+    python -m PyInstaller --noconfirm build.spec
+    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+Observação: o executável precisa existir em dist\ antes de o ISCC ser
+executado, pois o instalador valida e inclui esse arquivo.
+
+-------------------------------------------------------------------------------
+5. COMO TESTAR
+-------------------------------------------------------------------------------
+Testes automatizados das regras de negócio:
+    cd h:\Desktop\CRUD\sistema_gestao
+    python tests\test_core.py
+
+Teste manual do primeiro acesso (em uma instalação nova):
+    1. Abra o programa.
+    2. Na tela de login, clique em "Novo cadastro".
+    3. Informe nome, usuário e senha (mínimo 8 caracteres) e conclua.
+    4. Entre com o usuário e senha cadastrados.
+    5. Confira em Configurações -> Cadastro da empresa se os dados da
+       empresa podem ser preenchidos e salvos.
+
+-------------------------------------------------------------------------------
+6. ACESSOS
+-------------------------------------------------------------------------------
+Primeiro acesso (recomendado):
+    Criar o próprio usuário pelo botão "Novo cadastro" da tela inicial.
+    Esse usuário é criado como administrador.
+
+Conta padrão de instalação (alternativa):
+    Usuário: admin
+    Senha provisória: Lg#2026Adm!
+    O sistema solicita a troca da senha no primeiro acesso.
+
+Demais usuários:
+    Cadastrados pelo administrador na tela Funcionários, informando nome,
+    usuário de acesso, senha e tipo de usuário (administrador ou funcionário).
+
+-------------------------------------------------------------------------------
+7. OBSERVAÇÕES IMPORTANTES
+-------------------------------------------------------------------------------
+- O botão "Novo cadastro" da tela inicial aparece apenas enquanto o sistema
+  não possui administrador com senha definitiva. Depois disso, ele é
+  substituído pela dica de redefinição de senha, evitando que qualquer
+  pessoa crie um acesso depois da instalação.
+- O AppId do Inno Setup é fixo. Por isso, instalar a versão 2.0.0 sobre uma
+  versão anterior atualiza a instalação existente e PRESERVA o banco de
+  dados e os backups.
+- O banco de dados e os backups ficam na pasta de instalação do programa
+  (data e backups), não na pasta temporária do sistema.
+- O instalador é instalado em %LOCALAPPDATA% (PrivilegesRequired=lowest),
+  portanto não exige senha de administrador do Windows.
+
+===============================================================================
+ FIM DO DOCUMENTO
+===============================================================================
