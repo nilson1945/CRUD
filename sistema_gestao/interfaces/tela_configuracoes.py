@@ -17,8 +17,17 @@ from database import (
     restaurar_banco,
 )
 from interfaces.componentes import botao, confirmar, entrada, mensagem, painel, preencher, rotulo, tabela
-from interfaces.tela_login import CAMPOS_EMPRESA
 from validacoes import formatar_data
+
+CAMPOS_EMPRESA = (
+    ("nome_empresa", "Nome da empresa *"),
+    ("empresa_cnpj", "CNPJ"),
+    ("empresa_telefone", "Telefone"),
+    ("empresa_email", "E-mail"),
+    ("empresa_endereco", "Endereço"),
+    ("empresa_cidade", "Cidade"),
+    ("empresa_estado", "UF"),
+)
 
 
 class TelaConfiguracoes(ctk.CTkFrame):

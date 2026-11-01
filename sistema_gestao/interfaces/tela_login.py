@@ -1,4 +1,4 @@
-"""Tela de autenticação e cadastro de primeiro acesso."""
+"""Tela de autenticação e cadastro de usuário do primeiro acesso."""
 
 from __future__ import annotations
 
@@ -9,18 +9,10 @@ import customtkinter as ctk
 import autenticacao
 import tema
 from database import obter_config
-from funcionarios import criar_primeiro_administrador, empresa_configurada
+from funcionarios import criar_usuario_inicial, primeiro_acesso_pendente
 from interfaces.componentes import botao, entrada, mensagem, rotulo
 
-CAMPOS_EMPRESA = (
-    ("nome_empresa", "Nome da empresa *"),
-    ("empresa_cnpj", "CNPJ"),
-    ("empresa_telefone", "Telefone"),
-    ("empresa_email", "E-mail"),
-    ("empresa_endereco", "Endereço"),
-    ("empresa_cidade", "Cidade"),
-    ("empresa_estado", "UF"),
-)
+DICA_SENHA = "Esqueceu a senha? Solicite ao administrador a redefinição."
 
 
 class TelaLogin(ctk.CTk):
@@ -34,48 +26,47 @@ class TelaLogin(ctk.CTk):
         ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("blue")
 
-        primeiro_acesso = not empresa_configurada()
-        empresa = obter_config("nome_empresa", "Dimensão do Logus")
-        quadro = ctk.CTkFrame(
+        self.quadro = ctk.CTkFrame(
             self, fg_color=tema.BG_PAINEL, corner_radius=16,
             border_width=1, border_color=tema.BORDA,
         )
-        quadro.pack(fill="both", expand=True, padx=28, pady=28)
+        self.quadro.pack(fill="both", expand=True, padx=28, pady=28)
 
-        self.lbl_empresa = rotulo(quadro, empresa, 20, True)
-        self.lbl_empresa.pack(pady=(28, 4))
-        rotulo(quadro, "Gestão empresarial", 13, cor=tema.TXT_MUTED).pack()
-        rotulo(quadro, "Entre com seu usuário e senha", 12, cor=tema.TXT_SUAVE).pack(pady=(18, 8))
+        rotulo(self.quadro, obter_config("nome_empresa", "Dimensão do Logus"), 20, True).pack(
+            pady=(28, 4)
+        )
+        rotulo(self.quadro, "Gestão empresarial", 13, cor=tema.TXT_MUTED).pack()
+        rotulo(self.quadro, "Entre com seu usuário e senha", 12, cor=tema.TXT_SUAVE).pack(
+            pady=(18, 8)
+        )
 
-        rotulo(quadro, "Usuário", 12).pack(anchor="w", padx=40)
-        self.ent_user = entrada(quadro, width=340)
+        rotulo(self.quadro, "Usuário", 12).pack(anchor="w", padx=40)
+        self.ent_user = entrada(self.quadro, width=340)
         self.ent_user.pack(padx=40, pady=(0, 10))
-        rotulo(quadro, "Senha", 12).pack(anchor="w", padx=40)
-        self.ent_pass = entrada(quadro, width=340, show="*")
+        rotulo(self.quadro, "Senha", 12).pack(anchor="w", padx=40)
+        self.ent_pass = entrada(self.quadro, width=340, show="*")
         self.ent_pass.pack(padx=40, pady=(0, 16))
         self.ent_pass.bind("<Return>", lambda e: self._entrar())
 
-        botao(quadro, "Entrar", self._entrar, width=340).pack(pady=(4, 14))
+        botao(self.quadro, "Entrar", self._entrar, width=340).pack(pady=(4, 14))
+        self.frame_rodape = ctk.CTkFrame(self.quadro, fg_color="transparent")
+        self.frame_rodape.pack(fill="x")
+        self._montar_rodape()
+        self.ent_user.focus()
 
-        self.frame_inicial = None
-        self.frame_dica = None
-        if primeiro_acesso:
-            self.frame_inicial = ctk.CTkFrame(quadro, fg_color="transparent")
-            self.frame_inicial.pack(fill="x")
-            rotulo(self.frame_inicial, "Primeiro acesso", 11, cor=tema.TXT_MUTED).pack(pady=(0, 6))
+    def _montar_rodape(self):
+        for widget in self.frame_rodape.winfo_children():
+            widget.destroy()
+        if primeiro_acesso_pendente():
+            rotulo(self.frame_rodape, "Precisa criar o seu acesso?", 11, cor=tema.TXT_MUTED).pack(
+                pady=(0, 6)
+            )
             botao(
-                self.frame_inicial, "Cadastrar empresa e usuário", self._cadastro_inicial,
+                self.frame_rodape, "Novo cadastro", self._novo_cadastro,
                 "secundario", width=340,
             ).pack()
         else:
-            self.frame_dica = ctk.CTkFrame(quadro, fg_color="transparent")
-            self.frame_dica.pack(fill="x")
-            rotulo(
-                self.frame_dica,
-                "Esqueceu a senha? Solicite ao administrador a redefinição.",
-                11, cor=tema.TXT_MUTED,
-            ).pack(pady=(0, 16))
-        self.ent_user.focus()
+            rotulo(self.frame_rodape, DICA_SENHA, 11, cor=tema.TXT_MUTED).pack(pady=(0, 16))
 
     def _entrar(self):
         dados = autenticacao.autenticar(self.ent_user.get(), self.ent_pass.get())
@@ -85,83 +76,73 @@ class TelaLogin(ctk.CTk):
         self.usuario = dados
         self.destroy()
 
-    def _cadastro_inicial(self):
-        usuario = abrir_cadastro_inicial(self)
+    def _novo_cadastro(self):
+        usuario = abrir_novo_cadastro(self)
         if not usuario:
             return
-        self.lbl_empresa.configure(text=obter_config("nome_empresa", "Dimensão do Logus"))
-        if self.frame_inicial is not None:
-            self.frame_inicial.destroy()
-            self.frame_inicial = None
-            self.frame_dica = ctk.CTkFrame(self.lbl_empresa.master, fg_color="transparent")
-            self.frame_dica.pack(fill="x")
-            rotulo(
-                self.frame_dica,
-                "Esqueceu a senha? Solicite ao administrador a redefinição.",
-                11, cor=tema.TXT_MUTED,
-            ).pack(pady=(0, 16))
+        self._montar_rodape()
         self.ent_user.delete(0, "end")
         self.ent_user.insert(0, usuario)
         self.ent_pass.delete(0, "end")
         self.ent_pass.focus()
-        mensagem(self, "Primeiro acesso", "Cadastro concluído. Informe a senha para entrar.")
+        mensagem(self, "Novo cadastro", "Cadastro concluído. Informe a senha para entrar.")
 
 
-def abrir_cadastro_inicial(master) -> Optional[str]:
-    """Diálogo de primeiro acesso: cadastro da empresa e do primeiro administrador."""
+def abrir_novo_cadastro(master) -> Optional[str]:
+    """Cadastro de usuário na tela inicial (primeiro acesso do sistema)."""
     criado = {"usuario": None}
     top = ctk.CTkToplevel(master)
-    top.title("Primeiro acesso — cadastro da empresa")
-    top.geometry("560x700")
+    top.title("Novo cadastro")
+    top.geometry("480x520")
     top.configure(fg_color=tema.BG_APP)
     top.transient(master)
     top.grab_set()
 
-    corpo = ctk.CTkScrollableFrame(top, fg_color=tema.BG_PAINEL, corner_radius=12)
+    corpo = ctk.CTkFrame(top, fg_color=tema.BG_PAINEL, corner_radius=12)
     corpo.pack(fill="both", expand=True, padx=14, pady=14)
-    rotulo(corpo, "Cadastro da empresa", 18, True).pack(anchor="w", padx=10, pady=(10, 0))
+    rotulo(corpo, "Novo cadastro", 18, True).pack(anchor="w", padx=20, pady=(18, 0))
     rotulo(
         corpo,
-        "Informe os dados da empresa e crie o primeiro usuário administrador.",
+        "Crie o seu usuário de acesso ao sistema.",
         12, cor=tema.TXT_SUAVE,
-    ).pack(anchor="w", padx=10, pady=(2, 8))
+    ).pack(anchor="w", padx=20, pady=(2, 10))
 
     campos: dict[str, ctk.CTkEntry] = {}
 
     def campo(chave: str, label: str, senha: bool = False):
-        rotulo(corpo, label, 12).pack(anchor="w", padx=10, pady=(8, 2))
-        e = entrada(corpo, width=460, show="*" if senha else "")
-        e.pack(anchor="w", padx=10)
+        rotulo(corpo, label, 12).pack(anchor="w", padx=20, pady=(8, 2))
+        e = entrada(corpo, width=380, show="*" if senha else "")
+        e.pack(anchor="w", padx=20)
         campos[chave] = e
 
-    for chave, label in CAMPOS_EMPRESA:
-        campo(chave, label)
-
-    rotulo(corpo, "Primeiro usuário administrador", 16, True).pack(
-        anchor="w", padx=10, pady=(18, 0)
-    )
-    campo("nome", "Nome do administrador *")
+    campo("nome", "Nome completo *")
     campo("usuario", "Usuário de acesso *")
     campo("senha", "Senha (mínimo 8 caracteres) *", senha=True)
     campo("confirmar", "Confirmar senha *", senha=True)
+
+    ctk.CTkLabel(
+        corpo,
+        text="Os demais usuários são cadastrados em Funcionários, pelo administrador.",
+        text_color=tema.TXT_MUTED, wraplength=400, justify="left",
+        font=ctk.CTkFont(family=tema.FONTE, size=11),
+    ).pack(anchor="w", padx=20, pady=(14, 0))
 
     def salvar():
         if campos["senha"].get() != campos["confirmar"].get():
             mensagem(top, "Senha", "A confirmação da senha não confere.", erro=True)
             return
-        empresa = {chave: campos[chave].get() for chave, _ in CAMPOS_EMPRESA}
         dados = {chave: campos[chave].get() for chave in ("nome", "usuario", "senha")}
         try:
-            criar_primeiro_administrador(empresa, dados)
+            criar_usuario_inicial(dados)
         except (ValueError, PermissionError) as exc:
-            mensagem(top, "Primeiro acesso", str(exc), erro=True)
+            mensagem(top, "Novo cadastro", str(exc), erro=True)
             return
         criado["usuario"] = dados["usuario"].strip()
-        mensagem(top, "Primeiro acesso", "Cadastro concluído com sucesso.")
+        mensagem(top, "Novo cadastro", "Cadastro concluído com sucesso.")
         top.destroy()
 
     linha = ctk.CTkFrame(corpo, fg_color="transparent")
-    linha.pack(fill="x", padx=10, pady=16)
+    linha.pack(fill="x", padx=20, pady=18)
     botao(linha, "Cancelar", top.destroy, "secundario", width=140).pack(side="right", padx=4)
     botao(linha, "Concluir cadastro", salvar, width=180).pack(side="right", padx=4)
 

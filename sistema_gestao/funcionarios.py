@@ -11,7 +11,6 @@ from database import (
     PERMISSOES_ADMIN,
     PERMISSOES_FUNCIONARIO,
     get_connection,
-    obter_config,
     registrar_acao,
     salvar_config,
 )
@@ -149,9 +148,16 @@ def salvar(dados: dict, usuario_logado: dict) -> int:
         return int(fid)
 
 
-def empresa_configurada() -> bool:
-    """Indica se o primeiro acesso (cadastro da empresa) já foi concluído."""
-    return obter_config("empresa_configurada", "0") == "1"
+def primeiro_acesso_pendente() -> bool:
+    """True enquanto nenhum administrador tiver senha definitiva configurada."""
+    with get_connection() as con:
+        row = con.execute(
+            """
+            SELECT COUNT(*) c FROM funcionarios
+            WHERE tipo_usuario='administrador' AND situacao='ativo' AND senha_provisoria=0
+            """
+        ).fetchone()
+        return row["c"] == 0
 
 
 def salvar_empresa(dados: dict) -> None:
@@ -175,20 +181,22 @@ def salvar_empresa(dados: dict) -> None:
         salvar_config(chave, valor)
 
 
-def criar_primeiro_administrador(empresa: dict, dados: dict) -> int:
-    """Cadastro de primeiro acesso: dados da empresa + primeiro usuário administrador."""
-    if empresa_configurada():
-        raise PermissionError("O sistema já foi configurado. Entre com seu usuário e senha.")
+def criar_usuario_inicial(dados: dict) -> int:
+    """Cadastro de primeiro acesso: cria o usuário administrador definitivo."""
+    if not primeiro_acesso_pendente():
+        raise PermissionError(
+            "O sistema já possui administrador configurado. "
+            "Procure o administrador para criar o seu acesso."
+        )
     nome = (dados.get("nome") or "").strip()
     usuario = (dados.get("usuario") or "").strip()
     senha = dados.get("senha") or ""
     if not nome:
-        raise ValueError("Informe o nome do administrador.")
+        raise ValueError("Informe o nome do usuário.")
     if not usuario:
         raise ValueError("Informe o usuário de acesso.")
     if len(senha) < 8:
         raise ValueError("A senha deve ter pelo menos 8 caracteres.")
-    salvar_empresa(empresa)
 
     agora = datetime.now().isoformat(timespec="seconds")
     sh = hash_senha(senha)
@@ -237,7 +245,6 @@ def criar_primeiro_administrador(empresa: dict, dados: dict) -> int:
                 (fid, usuario, sh),
             )
         con.commit()
-    salvar_config("empresa_configurada", "1")
     registrar_acao(fid, "primeiro_acesso", "funcionarios", fid, nome)
     return int(fid)
 

@@ -43,14 +43,15 @@ python sistema_gestao\CRUD.py
 
 ## Acesso inicial
 
-Na primeira execução, a tela de abertura ("Primeiro acesso") permite cadastrar os dados da empresa e o primeiro usuário administrador:
+Na primeira execução, a tela de abertura permite criar o seu usuário de acesso ao sistema:
 
-1. Clique em **Cadastrar empresa e usuário**.
-2. Preencha os dados da empresa (nome, CNPJ, telefone, e-mail, endereço, cidade e UF).
-3. Informe o nome do administrador, o **usuário** e a **senha** (mínimo 8 caracteres).
-4. Depois do cadastro, entre com o usuário e a senha criados.
+1. Clique em **Novo cadastro**.
+2. Informe o nome completo, o **usuário** e a **senha** (mínimo 8 caracteres).
+3. Depois do cadastro, entre com o usuário e a senha criados.
 
-Os dados da empresa podem ser alterados a qualquer momento em **Configurações → Cadastro da empresa**.
+Esse primeiro usuário é criado como administrador. Os demais usuários são cadastrados pelo administrador em **Funcionários**.
+
+Os dados da empresa (nome, CNPJ, telefone, e-mail, endereço, cidade e UF) são preenchidos dentro do programa, em **Configurações → Cadastro da empresa**.
 
 Se preferir, ainda existe a conta padrão de instalação:
 
